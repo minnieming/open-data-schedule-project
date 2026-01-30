@@ -1,27 +1,28 @@
 package org.example.javadata.dto;
 
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
+@Builder
 public class WeatherReqDTO {
-    private String regionCode;
-    private String regionName;
 
-    private int rainProbability;
-    private int humidity;
+    private String STDG_SGG_CD;   // 지역코드
+    private String SGG_NM;        // 지역명
 
-    private String skyStatus;
-    private double currentTemp;
-    private double tempAfter3h;
+    private String SKY_STTS;
+    private String N1HR_RN;
+    private Integer HMTY_;
+    private String PRCON_CRTR_TM;
+    private Integer POR;
 
-    private double rainAmount1h;
-    private String rainType;
+    private Integer YMAP_CRTS;
+    private String N3HS_AIRTP;    // null 가능
+    private String PCPTTN_SHP;
+    private String NOW_AIRTP;
 
-    private String forecastTime;
-    private String observedTime;
-
-    private int xCoord;
-    private int yCoord;
+    private String FRCST_CRTR_TM;
+    private Integer XMAP_CRTS;
 }

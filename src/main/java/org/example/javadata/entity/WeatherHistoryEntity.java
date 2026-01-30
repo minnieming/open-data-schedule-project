@@ -16,9 +16,8 @@ import org.example.javadata.dto.WeatherReqDTO;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "weather_latest")
-public class WeatherLatestEntity {
-
+@Table(name = "weather_history")
+public class WeatherHistoryEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -41,8 +40,8 @@ public class WeatherLatestEntity {
     private String forecastTime;        // FRCST_CRTR_TM
     private Integer xCoord;             // XMAP_CRTS
 
-    public static WeatherLatestEntity from(WeatherReqDTO dto) {
-        return WeatherLatestEntity.builder()
+    public static WeatherHistoryEntity from(WeatherReqDTO dto) {
+        return WeatherHistoryEntity.builder()
                 .regionCode(dto.getSTDG_SGG_CD())
                 .regionName(dto.getSGG_NM())
                 .skyStatus(dto.getSKY_STTS())
