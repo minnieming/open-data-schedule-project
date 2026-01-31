@@ -20,4 +20,6 @@ public class WeatherBatchService {
             log.error("Weather batch 실행 실패", e);
         }
     }
+
+
 }
