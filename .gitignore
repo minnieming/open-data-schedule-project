@@ -35,3 +35,16 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# nGrinder
+ngrinder-agent/
+ngrinder-controller/
+
+# logs / pid / db
+*.log
+*.pid
+*.db
+*.trace.db
+
+# macOS
+.DS_Store
