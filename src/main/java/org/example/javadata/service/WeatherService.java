@@ -1,6 +1,7 @@
 package org.example.javadata.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.javadata.dto.WeatherReqDTO;
 import org.example.javadata.entity.WeatherHistoryEntity;
 import org.example.javadata.entity.WeatherLatestEntity;
@@ -10,11 +11,15 @@ import org.example.javadata.repository.WeatherLatestRepository;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class WeatherService {
 
@@ -22,6 +27,7 @@ public class WeatherService {
     private final WeatherHistoryRepository historyRepository;
     private final WeatherLatestRepository latestRepository;
 
+    @Transactional
     public int fetchAndSave(int pageNo, int numOfRows) throws Exception {
 
         String json = weatherInput.callApi(pageNo, numOfRows);
@@ -34,7 +40,8 @@ public class WeatherService {
         }
 
         List<WeatherHistoryEntity> histories = new ArrayList<>();
-        List<WeatherLatestEntity> latestList = new ArrayList<>();
+        Map<String, WeatherLatestEntity> latestByRegion = new LinkedHashMap<>();
+        int skippedCount = 0;
 
         for (int i = 0; i < bodyArray.length(); i++) {
             JSONObject item = bodyArray.getJSONObject(i);
@@ -55,21 +62,40 @@ public class WeatherService {
                     .XMAP_CRTS(optIntOrNull(item, "XMAP_CRTS"))
                     .build();
 
-            // history: 무조건 쌓기
-            histories.add(WeatherHistoryEntity.from(dto));
+            WeatherHistoryEntity history = WeatherHistoryEntity.from(dto);
+            if (history.getCurrentTemp() == null) {
+                skippedCount++;
+                log.warn("Skip weather row due to missing current temperature. regionCode={}, regionName={}, observedTime={}, forecastTime={}",
+                        dto.getSTDG_SGG_CD(), dto.getSGG_NM(), dto.getPRCON_CRTR_TM(), dto.getFRCST_CRTR_TM());
+                continue;
+            }
 
-            // latest: regionCode 기준 1개 유지
+            histories.add(history);
+
             String regionCode = dto.getSTDG_SGG_CD();
             if (regionCode != null && !regionCode.isBlank()) {
-                latestRepository.deleteByRegionCode(regionCode);
+                latestByRegion.put(regionCode, WeatherLatestEntity.from(dto));
             }
-            latestList.add(WeatherLatestEntity.from(dto));
+        }
+
+        if (histories.isEmpty()) {
+            throw new IllegalStateException("저장 가능한 날씨 데이터가 없습니다. 모든 응답 항목의 NOW_AIRTP 값이 비어 있습니다.");
         }
 
         historyRepository.saveAll(histories);
-        latestRepository.saveAll(latestList);
 
-        return bodyArray.length();
+        if (!latestByRegion.isEmpty()) {
+            for (String regionCode : latestByRegion.keySet()) {
+                latestRepository.deleteByRegionCode(regionCode);
+            }
+            latestRepository.saveAll(new ArrayList<>(latestByRegion.values()));
+        }
+
+        if (skippedCount > 0) {
+            log.warn("Skipped {} weather rows because current temperature was missing.", skippedCount);
+        }
+
+        return histories.size();
     }
 
     private Integer optIntOrNull(JSONObject obj, String key) {

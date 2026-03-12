@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Column;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,17 +29,24 @@ public class WeatherLatestEntity {
     private String regionName;          // SGG_NM
 
     private String skyStatus;           // SKY_STTS
+    @Column(nullable = true)
     private Double rainAmount1h;        // N1HR_RN (문자열인데 숫자일 때가 많음)
+    @Column(nullable = true)
     private Integer humidity;           // HMTY_
     private String observedTime;        // PRCON_CRTR_TM
+    @Column(nullable = true)
     private Integer rainProbability;    // POR
 
+    @Column(nullable = true)
     private Integer yCoord;             // YMAP_CRTS
+    @Column(nullable = true)
     private Double tempAfter3h;         // N3HS_AIRTP (null 가능)
     private String rainType;            // PCPTTN_SHP
+    @Column(nullable = true)
     private Double currentTemp;         // NOW_AIRTP
 
     private String forecastTime;        // FRCST_CRTR_TM
+    @Column(nullable = true)
     private Integer xCoord;             // XMAP_CRTS
 
     public static WeatherLatestEntity from(WeatherReqDTO dto) {
