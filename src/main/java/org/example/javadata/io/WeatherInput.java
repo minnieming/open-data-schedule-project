@@ -4,15 +4,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 
 @Component
 public class WeatherInput {
+
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
 
     @Value("${safety.api.base-url}")
     private String baseUrl;
@@ -33,34 +36,20 @@ public class WeatherInput {
                 .build(true)
                 .toUri();
 
-        System.out.println("FINAL URL=[" + uri + "]");
+        HttpRequest request = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofSeconds(10))
+                .header("Accept", "application/json")
+                .GET()
+                .build();
 
-        HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
-        conn.setRequestMethod("GET");
-        conn.setRequestProperty("Accept", "application/json");
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        int code = conn.getResponseCode();
-        InputStream stream = (code >= 200 && code < 300)
-                ? conn.getInputStream()
-                : conn.getErrorStream();
-
-        try (BufferedReader br =
-                     new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = br.readLine()) != null) {
-                sb.append(line);
-            }
-
-            if (code < 200 || code >= 300) {
-                throw new RuntimeException(
-                        "API 호출 실패 status=" + code + " body=" + sb
-                );
-            }
-            return sb.toString();
-        } finally {
-            conn.disconnect();
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new RuntimeException(
+                    "API 호출 실패 status=" + response.statusCode() + " body=" + response.body()
+            );
         }
+
+        return response.body();
     }
 }
