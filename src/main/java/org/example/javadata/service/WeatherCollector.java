@@ -4,12 +4,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.javadata.dto.WeatherReqDTO;
 import org.example.javadata.entity.WeatherHistoryEntity;
+import org.example.javadata.entity.WeatherHistoryOutboxEntity;
 import org.example.javadata.entity.WeatherLatestEntity;
+import org.example.javadata.event.WeatherCollectedEvent;
 import org.example.javadata.io.WeatherInput;
-import org.example.javadata.repository.WeatherHistoryRepository;
+import org.example.javadata.repository.WeatherHistoryOutboxRepository;
 import org.example.javadata.repository.WeatherLatestRepository;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,10 +27,12 @@ import java.util.Map;
 public class WeatherCollector implements PublicDataCollector {
 
     private final WeatherInput weatherInput;
-    private final WeatherHistoryRepository historyRepository;
+    private final WeatherHistoryOutboxRepository outboxRepository;
     private final WeatherLatestRepository latestRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
+    @Transactional
     public int collect() {
         try {
             return fetchAndSave(1, 100);
@@ -96,14 +101,23 @@ public class WeatherCollector implements PublicDataCollector {
             throw new IllegalStateException("저장 가능한 날씨 데이터가 없습니다. 모든 응답 항목의 NOW_AIRTP 값이 비어 있습니다.");
         }
 
-        historyRepository.saveAll(histories);
+        // history는 outbox에 저장 → 트랜잭션 커밋 후 이벤트로 별도 처리
+        List<WeatherHistoryOutboxEntity> outboxEntities = histories.stream()
+                .map(WeatherHistoryOutboxEntity::from)
+                .toList();
+        List<WeatherHistoryOutboxEntity> savedOutbox = outboxRepository.saveAll(outboxEntities);
+        List<Long> outboxIds = savedOutbox.stream().map(WeatherHistoryOutboxEntity::getId).toList();
 
+        // latest는 핵심 데이터 → 같은 트랜잭션에서 처리
         if (!latestByRegion.isEmpty()) {
             for (String regionCode : latestByRegion.keySet()) {
                 latestRepository.deleteByRegionCode(regionCode);
             }
             latestRepository.saveAll(new ArrayList<>(latestByRegion.values()));
         }
+
+        // latest 트랜잭션 커밋 후 history 저장 이벤트 발행
+        eventPublisher.publishEvent(new WeatherCollectedEvent(outboxIds));
 
         if (skippedCount > 0) {
             log.warn("[{}] Skipped {} weather rows because current temperature was missing.",
