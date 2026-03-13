@@ -10,7 +10,7 @@ import org.example.javadata.repository.WeatherHistoryRepository;
 import org.example.javadata.repository.WeatherLatestRepository;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -18,18 +18,32 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-@Service
+@Component
 @Slf4j
 @RequiredArgsConstructor
-public class WeatherService {
+public class WeatherCollector implements PublicDataCollector {
 
     private final WeatherInput weatherInput;
     private final WeatherHistoryRepository historyRepository;
     private final WeatherLatestRepository latestRepository;
 
+    @Override
+    public int collect() {
+        try {
+            return fetchAndSave(1, 100);
+        } catch (Exception e) {
+            log.error("[{}] 수집 실패", getCollectorName(), e);
+            return 0;
+        }
+    }
+
+    @Override
+    public String getCollectorName() {
+        return "WeatherCollector";
+    }
+
     @Transactional
     public int fetchAndSave(int pageNo, int numOfRows) throws Exception {
-
         String json = weatherInput.callApi(pageNo, numOfRows);
 
         JSONObject root = new JSONObject(json);
@@ -65,8 +79,8 @@ public class WeatherService {
             WeatherHistoryEntity history = WeatherHistoryEntity.from(dto);
             if (history.getCurrentTemp() == null) {
                 skippedCount++;
-                log.warn("Skip weather row due to missing current temperature. regionCode={}, regionName={}, observedTime={}, forecastTime={}",
-                        dto.getSTDG_SGG_CD(), dto.getSGG_NM(), dto.getPRCON_CRTR_TM(), dto.getFRCST_CRTR_TM());
+                log.warn("[{}] Skip weather row due to missing current temperature. regionCode={}, regionName={}, observedTime={}, forecastTime={}",
+                        getCollectorName(), dto.getSTDG_SGG_CD(), dto.getSGG_NM(), dto.getPRCON_CRTR_TM(), dto.getFRCST_CRTR_TM());
                 continue;
             }
 
@@ -92,9 +106,11 @@ public class WeatherService {
         }
 
         if (skippedCount > 0) {
-            log.warn("Skipped {} weather rows because current temperature was missing.", skippedCount);
+            log.warn("[{}] Skipped {} weather rows because current temperature was missing.",
+                    getCollectorName(), skippedCount);
         }
 
+        log.info("[{}] 수집 완료: {} 개 저장", getCollectorName(), histories.size());
         return histories.size();
     }
 
