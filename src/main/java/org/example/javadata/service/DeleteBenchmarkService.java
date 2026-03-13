@@ -6,6 +6,7 @@ import org.example.javadata.entity.WeatherHistoryEntity;
 import org.example.javadata.repository.WeatherHistoryRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.concurrent.Future;
 public class DeleteBenchmarkService {
 
     private final WeatherHistoryRepository weatherHistoryRepository;
+    private final TransactionTemplate transactionTemplate;
 
     // 더미 데이터 삽입
     @Transactional
@@ -90,7 +92,8 @@ public class DeleteBenchmarkService {
 
             futures.add(executor.submit(() -> {
                 log.info("[Benchmark][FAST] Thread-{}: DELETE id {} ~ {}", threadNum, startId, endId);
-                weatherHistoryRepository.deleteByIdBetween(startId, endId);
+                transactionTemplate.executeWithoutResult(status ->
+                        weatherHistoryRepository.deleteByIdBetween(startId, endId));
                 log.info("[Benchmark][FAST] Thread-{}: 완료", threadNum);
             }));
         }
