@@ -38,7 +38,8 @@ public class TourismInput {
     private String serviceKey;
 
     public String callApi(int pageNo, int numOfRows) throws Exception {
-        String yesterday = LocalDate.now().minusDays(1).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String endYmd = LocalDate.now().minusDays(35).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String startYmd = LocalDate.now().minusDays(65).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
         URI uri = UriComponentsBuilder
                 .fromUriString(baseUrl.trim())
@@ -48,8 +49,8 @@ public class TourismInput {
                 .queryParam("MobileOS", "ETC")
                 .queryParam("MobileApp", "JavaData")
                 .queryParam("_type", "json")
-                .queryParam("startYmd", yesterday)
-                .queryParam("endYmd", yesterday)
+                .queryParam("startYmd", startYmd)
+                .queryParam("endYmd", endYmd)
                 .build(true)
                 .toUri();
 

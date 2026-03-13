@@ -1,16 +1,22 @@
 package org.example.javadata.io;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 
+@Slf4j
 @Component
 public class AirQualityInput {
 
@@ -18,8 +24,13 @@ public class AirQualityInput {
 
     public AirQualityInput() {
         try {
-            SSLContext sslContext = SSLContext.getInstance("TLSv1.2");
-            sslContext.init(null, null, null);
+            TrustManager[] trustAll = new TrustManager[]{new X509TrustManager() {
+                public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+                public void checkClientTrusted(X509Certificate[] c, String a) {}
+                public void checkServerTrusted(X509Certificate[] c, String a) {}
+            }};
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, trustAll, new SecureRandom());
             this.httpClient = HttpClient.newBuilder()
                     .sslContext(sslContext)
                     .connectTimeout(Duration.ofSeconds(10))
@@ -28,6 +39,10 @@ public class AirQualityInput {
             throw new RuntimeException("HttpClient 초기화 실패", e);
         }
     }
+
+    private String lastUri;
+
+    public String getLastUri() { return lastUri; }
 
     @Value("${airquality.api.base-url}")
     private String baseUrl;
@@ -47,8 +62,12 @@ public class AirQualityInput {
                 .queryParam("returnType", "json")
                 .queryParam("sidoName", sidoName)
                 .queryParam("ver", "1.0")
-                .build(true)
+                .build(false)
+                .encode()
                 .toUri();
+
+        lastUri = uri.toString();
+        log.info("[AirQualityInput] 호출 URI: {}", uri);
 
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(15))
